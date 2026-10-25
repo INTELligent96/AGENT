@@ -1,0 +1,62 @@
+llm_profiles:
+  local_coder:
+    type: "openai_compat"
+    base_url: "http://localhost:1235/v1"
+    api_key: "lm-studio"
+    model_name: "qwen-qwen2.5-coder-14b-instruct"
+    is_local: true
+
+  local_logic:
+    type: "openai_compat"
+    base_url: "http://localhost:1235/v1"
+    api_key: "lm-studio"
+    model_name: "deepseek-r1-0528-qwen3-8b-abliterated"
+    is_local: true
+
+  local_fast:
+    type: "openai_compat"
+    base_url: "http://localhost:1235/v1"
+    api_key: "lm-studio"
+    model_name: "qwen2.5-7b-instruct-uncensored"
+    is_local: true
+
+  # ПРИМЕР: API-модель (раскомментируй, когда появятся ключи)
+  # deepseek_api:
+  #   type: "openai_compat"
+  #   base_url: "https://api.deepseek.com/v1"
+  #   api_key: "sk-твой-ключ"
+  #   model_name: "deepseek-coder"
+  #   is_local: false
+
+  manual_bridge:
+    type: "manual_bridge"
+
+# Теперь здесь указываются только ПРЕДПОЧТИТЕЛЬНЫЕ модели для старта
+routing:
+  default_model: "local_fast"
+  code_generation: "local_coder"
+  complex_reasoning: "local_logic"
+
+tools:
+  tesseract_path: "K:/Program Files/Tesseract-OCR/tesseract.exe"
+  use_ms_office: true 
+
+safety:
+  read_only_originals: true 
+  workspace_dir: "workspace" 
+
+agent_loop:
+  max_iterations: 10
+  task_timeout_seconds: 600
+  code_execution_timeout: 15
+  max_tokens_default: 4096
+  retry_attempts: 2
+  retry_delay_seconds: 2
+
+rag:
+  db_path: "chroma_db"
+  collection_name: "documents"
+  chunk_size: 1000
+  chunk_overlap: 200
+  embedding_model: "paraphrase-multilingual-MiniLM-L12-v2"
+  separators: ["\n\n", "\n", ". ", "! ", "? ", " ", ""]

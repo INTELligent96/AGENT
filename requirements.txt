@@ -16,3 +16,18 @@ pytest
 pytest-asyncio
 python-multipart
 playwright-stealth
+requests pyyaml
+openpyxl
+PyMuPDF
+pytesseract
+Pillow
+docxtpl
+xlrd
+pandas
+pywin32
+chromadb
+sentence-transformers
+customtkinter
+pandas
+xlsxwriter
+duckduckgo-search
