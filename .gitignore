@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+auth.json
+audit.log
+.venv/
+venv/
+.pytest_cache/
+deepseek_profile/
+deepseek_chat_state.json
