@@ -8,6 +8,8 @@ from documents.extractors import extract_text
 from documents.writers import create_simple_docx
 from core.prompts import SUMMARIZE_PROMPT, STRUCTURE_PROMPT, SPELLCHECK_PROMPT, CODE_PROMPT
 from core.workspace import WorkspaceManager
+from core.router import IntentRouter
+from core.self_check import Critic
 from tools.validator import validate_python_code
 from tools.file_manager import generate_file_list
 from tools.excel_tools import create_excel_chart
@@ -22,6 +24,8 @@ class Agent:
 
         self.tools = self.config.get("tools", {})
         self.registry = LLMRegistry(config_path)
+        self.router = IntentRouter(self.registry, self.config)
+        self.critic = Critic(self.registry, self.config)
 
         safety = self.config.get("safety", {})
         self.workspace = WorkspaceManager(
@@ -38,6 +42,7 @@ class Agent:
         self._rag = None
         self.output_dir = "output"
         Path(self.output_dir).mkdir(exist_ok=True)
+        self.last_generated_code = ""
 
     @property
     def rag(self):
@@ -45,12 +50,175 @@ class Agent:
             self._rag = RAGQuestionAnswerer(self.config, self.tools, self.registry)
         return self._rag
 
-    # --- ДЛИННЫЕ ДОКУМЕНТЫ ---
+    # ============ ГЛАВНЫЙ ОРКЕСТРАТОР ============
+    def run_task(self, user_text: str, log_callback=None) -> str:
+        def log(msg):
+            print(msg)
+            if log_callback: log_callback(msg)
+
+        log("[Роутер] Анализирую запрос...")
+        routing = self.router.classify(user_text)
+        tools = routing.get("tools", ["ask_question"])
+        log(f"[Роутер] → {tools} ({routing.get('reasoning', '')})")
+
+        results = []
+        for tool_name in tools:
+            log(f"\n[Инструмент] {tool_name}")
+            try:
+                result = self._execute_tool(tool_name, user_text, log)
+                results.append(f"=== {tool_name} ===\n{result}")
+            except Exception as e:
+                log(f"[Ошибка] {tool_name}: {e}")
+                results.append(f"=== {tool_name} (ОШИБКА) ===\n{e}")
+
+        return "\n\n".join(results) if len(results) > 1 else results[0]
+
+    def _execute_tool(self, tool_name: str, user_text: str, log) -> str:
+        if tool_name == "ask_question":
+            def gen(feedback):
+                base = user_text if not feedback else f"{user_text}\n\n{feedback}"
+                return self.ask_question(base)
+            return self.critic.run_with_retry(gen, task=user_text, task_type="rag")
+
+        if tool_name == "summarize_file":
+            file_path = self._extract_path_from_text(user_text)
+            if not file_path:
+                return "Укажите файл: 'сделай резюме путь/к/файлу'"
+            def gen(feedback):
+                text = self._read_safe(file_path)
+                prompt = SUMMARIZE_PROMPT.format(text=text[:8000])
+                if feedback: prompt = f"{prompt}\n\n{feedback}"
+                return self.registry.generate_with_fallback("default_model", prompt)
+            return self.critic.run_with_retry(gen, task=user_text, task_type="summarize")
+
+        if tool_name == "check_spelling":
+            file_path = self._extract_path_from_text(user_text)
+            if not file_path:
+                return "Укажите файл: 'проверь ошибки путь/к/файлу'"
+            return self.check_spelling_file(file_path)
+
+        if tool_name == "generate_code":
+            return self.generate_code_with_validation(user_text)
+
+        if tool_name == "batch_summarize":
+            folder = self._extract_path_from_text(user_text)
+            if not folder: return "Укажите папку."
+            return self.batch_summarize(folder)
+
+        if tool_name == "classify_files":
+            folder = self._extract_path_from_text(user_text)
+            if not folder: return "Укажите папку."
+            return self.classify_files(folder)
+
+        if tool_name == "make_file_list":
+            folder = self._extract_path_from_text(user_text)
+            if not folder: return "Укажите папку."
+            return self.make_file_list(folder, recursive=True)
+
+        if tool_name == "make_excel_chart":
+            file_path = self._extract_path_from_text(user_text)
+            if not file_path: return "Укажите Excel-файл."
+            return self.make_excel_chart(file_path)
+
+        if tool_name == "web_search":
+            return self.web_search(user_text)
+
+        if tool_name == "process_long_doc":
+            file_path = self._extract_path_from_text(user_text)
+            if not file_path: return "Укажите файл."
+            return self.process_long_document(file_path)
+
+        if tool_name == "index_folder":
+            folder = self._extract_path_from_text(user_text)
+            if not folder: return "Укажите папку."
+            return self.index_folder(folder)
+
+        if tool_name == "open_style_studio":
+            return "[Откройте вкладку 'Студия стилей Word' в левой панели интерфейса]"
+
+        return f"[Неизвестный инструмент: {tool_name}]"
+
+    def _extract_path_from_text(self, text: str) -> str:
+        """Ищет путь в тексте. Без regex — просто по токенам с известными расширениями."""
+        exts = (
+            '.txt', '.docx', '.doc', '.pdf', '.xlsx', '.xls', '.csv',
+            '.png', '.jpg', '.jpeg', '.bmp', '.tiff'
+        )
+        # Символы, которые нужно убрать с краёв токена
+        bad_chars = ('"', "'", '`', '(', ')', '[', ']', '{', '}', '<', '>', ',', ';', ':', '!', '?')
+        for raw_token in text.split():
+            token = raw_token
+            # Убираем обрамляющие кавычки и скобки
+            changed = True
+            while changed and token:
+                changed = False
+                if token[0] in bad_chars:
+                    token = token[1:]
+                    changed = True
+                if token and token[-1] in bad_chars:
+                    token = token[:-1]
+                    changed = True
+            if not token:
+                continue
+            if token.lower().endswith(exts):
+                return token
+        return None
+
+    # ============ ИНСТРУМЕНТЫ ============
+    def ask_question(self, question: str) -> str:
+        return self.rag.ask(question)
+
+    def check_spelling_file(self, file_path: str) -> str:
+        text = self._read_safe(file_path)
+        if text.startswith("[Ошибка]"): return text
+        prompt = SPELLCHECK_PROMPT.format(text=text[:8000])
+        return self.registry.generate_with_fallback("default_model", prompt)
+
+    def generate_code_with_validation(self, task: str) -> str:
+        self.reset_stop_flag()
+        current_prompt = CODE_PROMPT.format(task=task)
+        last_code = ""
+        start_time = time.time()
+
+        for iteration in range(1, self.max_iterations + 1):
+            if self._stop_requested: return f"--- ПРЕРВАНО ---\n\n{last_code}"
+            if time.time() - start_time > self.task_timeout: return f"--- ТАЙМАУТ ---\n\n{last_code}"
+
+            code = self.registry.generate_with_fallback("code_generation", current_prompt)
+            last_code = code
+
+            if code.startswith("[КРИТИЧЕСКАЯ") or code.startswith("[ВНИМАНИЕ:"): return code
+
+            is_valid, error_msg = validate_python_code(code, timeout_sec=self.code_timeout)
+            if is_valid:
+                if self.critic.enabled and self.critic.force_always:
+                    verdict = self.critic.check_general(task, code, "code")
+                    print(f"  [Критик-код] score={verdict.get('score')}")
+                    if verdict.get("verdict") != "accept" or verdict.get("score", 0) < self.critic.min_score:
+                        current_prompt = (
+                            f"Код работает, но критик нашёл проблемы: {verdict.get('issues')}\n"
+                            f"Перепиши, устранив их. Задача: {task}\nКод:\n{code}"
+                        )
+                        continue
+                return code
+
+            current_prompt = f"Твой предыдущий код упал: {error_msg}\n\nКод:\n{code}\n\nИсправь. Задача: {task}"
+        return f"--- ЛИМИТ ПОПЫТОК ---\n\n{last_code}"
+
+    def summarize_file(self, file_path: str) -> str:
+        text = self._read_safe(file_path)
+        if text.startswith("[Ошибка]"): return text
+        return self.registry.generate_with_fallback("default_model", SUMMARIZE_PROMPT.format(text=text[:8000]))
+
+    def structure_file(self, file_path: str) -> str:
+        text = self._read_safe(file_path)
+        if text.startswith("[Ошибка]"): return text
+        return self.registry.generate_with_fallback("complex_reasoning", STRUCTURE_PROMPT.format(text=text[:8000]))
+
     def process_long_document(self, file_path: str) -> str:
         processor = LongDocumentProcessor(self.config, self.tools, self.registry, self.output_dir)
         return processor.process(file_path)
 
-    # --- НОВЫЕ ИНСТРУМЕНТЫ ---
     def make_file_list(self, folder_path: str, recursive: bool) -> str:
         return generate_file_list(folder_path, recursive, self.output_dir)
 
@@ -61,44 +229,33 @@ class Agent:
         folder = Path(folder_path)
         sorted_dir = Path(self.output_dir) / f"sorted_{folder.name}"
         sorted_dir.mkdir(parents=True, exist_ok=True)
-
-        files = [f for f in folder.iterdir() if f.is_file()]
-        for f in files:
+        for f in [x for x in folder.iterdir() if x.is_file()]:
             text = extract_text(str(f), self.tools)[:2000]
-            prompt = f"Определи категорию документа (одним словом: Договор, Счет, Отчет, Письмо, Прочее). Текст: {text}"
-            category = self.registry.generate_with_fallback("default_model", prompt).strip()
-            category = category.split()[0].replace('.', '').replace('"', '').replace("'", "")
-
-            cat_dir = sorted_dir / category
-            cat_dir.mkdir(exist_ok=True)
-            shutil.copy2(f, cat_dir / f.name)
+            prompt = f"Определи категорию (одним словом: Договор, Счет, Отчет, Письмо, Прочее). Текст: {text}"
+            cat = self.registry.generate_with_fallback("default_model", prompt).strip().split()[0]
+            cat = cat.replace('.', '').replace('"', '').replace("'", "")
+            (sorted_dir / cat).mkdir(exist_ok=True)
+            shutil.copy2(f, sorted_dir / cat / f.name)
         return str(sorted_dir)
 
     def batch_summarize(self, folder_path: str) -> str:
         folder = Path(folder_path)
-        files = [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() in ['.txt', '.docx', '.pdf']]
-
-        final_text = ""
-        for f in files:
-            text = self._read_safe(str(f))
-            if text.startswith("[Ошибка]"): continue
-            prompt = SUMMARIZE_PROMPT.format(text=text[:6000])
-            summary = self.registry.generate_with_fallback("default_model", prompt)
-            final_text += f"=== РЕЗЮМЕ ФАЙЛА: {f.name} ===\n{summary}\n\n"
-
-        out_file = Path(self.output_dir) / f"batch_summary_{folder.name}.docx"
-        create_simple_docx(final_text, str(out_file))
-        return str(out_file)
+        final = ""
+        for f in folder.iterdir():
+            if f.is_file() and f.suffix.lower() in ['.txt', '.docx', '.pdf']:
+                text = self._read_safe(str(f))
+                if text.startswith("[Ошибка]"): continue
+                s = self.registry.generate_with_fallback("default_model", SUMMARIZE_PROMPT.format(text=text[:6000]))
+                final += f"=== {f.name} ===\n{s}\n\n"
+        out = Path(self.output_dir) / f"batch_summary_{folder.name}.docx"
+        create_simple_docx(final, str(out))
+        return str(out)
 
     def web_search(self, query: str) -> str:
         return search_web(query)
 
-    # --- БАЗОВЫЕ МЕТОДЫ ---
     def index_folder(self, folder_path: str):
         return self.rag.indexer.index_folder(folder_path)
-
-    def ask_question(self, question: str) -> str:
-        return self.rag.ask(question)
 
     def request_stop(self):
         self._stop_requested = True
@@ -109,39 +266,3 @@ class Agent:
     def _read_safe(self, file_path: str) -> str:
         safe_path = self.workspace.prepare_file(file_path)
         return extract_text(safe_path, self.tools)
-
-    def generate_code_with_validation(self, task: str) -> str:
-        self.reset_stop_flag()
-        current_prompt = CODE_PROMPT.format(task=task)
-        last_generated_code = ""
-        start_time = time.time()
-
-        for iteration in range(1, self.max_iterations + 1):
-            if self._stop_requested: return f"--- ПРЕРВАНО ---\n\n{last_generated_code}"
-            if time.time() - start_time > self.task_timeout: return f"--- ТАЙМАУТ ---\n\n{last_generated_code}"
-
-            code = self.registry.generate_with_fallback("code_generation", current_prompt)
-            last_generated_code = code
-
-            if code.startswith("[КРИТИЧЕСКАЯ ОШИБКА]") or code.startswith("[ВНИМАНИЕ:"): return code
-
-            is_valid, error_msg = validate_python_code(code, timeout_sec=self.code_timeout)
-            if is_valid: return code
-
-            current_prompt = f"Твой предыдущий код выдал ошибку:\n{error_msg}\n\nКод:\n{code}\n\nИсправь. Задача: {task}"
-        return f"--- ЛИМИТ ПОПЫТОК ---\n\n{last_generated_code}"
-
-    def summarize_file(self, file_path: str) -> str:
-        text = self._read_safe(file_path)
-        if text.startswith("[Ошибка]"): return text
-        return self.registry.generate_with_fallback("default_model", SUMMARIZE_PROMPT.format(text=text[:8000]))
-
-    def check_spelling_file(self, file_path: str) -> str:
-        text = self._read_safe(file_path)
-        if text.startswith("[Ошибка]"): return text
-        return self.registry.generate_with_fallback("default_model", SPELLCHECK_PROMPT.format(text=text[:8000]))
-
-    def structure_file(self, file_path: str) -> str:
-        text = self._read_safe(file_path)
-        if text.startswith("[Ошибка]"): return text
-        return self.registry.generate_with_fallback("complex_reasoning", STRUCTURE_PROMPT.format(text=text[:8000]))

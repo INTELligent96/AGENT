@@ -1,0 +1,102 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Document Agent PRO - Инструкция</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #2980b9; margin-top: 30px; border-bottom: 1px solid #bdc3c7; padding-bottom: 5px; }
+        h3 { color: #16a085; }
+        p { margin-bottom: 15px; }
+        ul, ol { margin-bottom: 15px; padding-left: 20px; }
+        li { margin-bottom: 5px; }
+        code { background-color: #ecf0f1; color: #c0392b; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; }
+        pre { background-color: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; }
+        pre code { background-color: transparent; color: inherit; padding: 0; }
+        .alert { background-color: #ffeaa7; border-left: 5px solid #fdcb6e; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
+        .danger { background-color: #ff7675; color: white; border-left: 5px solid #d63031; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px; text-align: left; }
+        th { background-color: #ecf0f1; font-weight: bold; }
+        .toc { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        .toc a { text-decoration: none; color: #3498db; }
+        .toc a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1>🤖 AI Document Agent PRO</h1>
+    <div class="toc">
+        <h3>Содержание</h3>
+        <ul>
+            <li><a href="#sec1">1. Что это и зачем</a></li>
+            <li><a href="#sec2">2. Требования к системе</a></li>
+            <li><a href="#sec3">3. Установка с нуля</a></li>
+            <li><a href="#sec4">4. Первый запуск</a></li>
+            <li><a href="#sec5">5. Интерфейс</a></li>
+            <li><a href="#sec6">6. Роутер и Критик</a></li>
+            <li><a href="#sec7">7. Word Студия</a></li>
+            <li><a href="#sec8">8. Добавление API</a></li>
+            <li><a href="#sec9">9. Частые проблемы</a></li>
+        </ul>
+    </div>
+
+    <h2 id="sec1">1. Что это и зачем</h2>
+    <p>Локальный ИИ-агент для работы с документами Word, Excel, PDF и картинками.</p>
+    <ul>
+        <li>Поиск по локальным документам (RAG).</li>
+        <li>Суммаризация, проверка орфографии, написание кода.</li>
+        <li>Создание документов Word с сохранением ваших стилей.</li>
+        <li>Автоматическая нумерация таблиц и рисунков.</li>
+        <li>Сортировка файлов, графики в Excel, веб-поиск.</li>
+    </ul>
+
+    <h2 id="sec2">2. Требования к системе</h2>
+    <table>
+        <tr><th>Компонент</th><th>Требование</th></tr>
+        <tr><td>ОС</td><td>Windows 10 / 11</td></tr>
+        <tr><td>Python</td><td>3.10</td></tr>
+        <tr><td>LM Studio</td><td>Порт 1235</td></tr>
+        <tr><td>Tesseract OCR</td><td>Языки rus + eng</td></tr>
+        <tr><td>MS Office</td><td>Word + Excel</td></tr>
+        <tr><td>RAM</td><td>От 16 ГБ</td></tr>
+    </table>
+
+    <h2 id="sec3">3. Установка с нуля</h2>
+    <div class="alert">
+        <strong>Внимание:</strong> Установите все библиотеки через <code>pip install</code>, а также Tesseract OCR и LM Studio.
+    </div>
+    <pre><code>pip install customtkinter python-docx openpyxl PyMuPDF pytesseract Pillow docxtpl xlrd pandas pywin32 chromadb sentence-transformers lxml ddgs xlsxwriter requests pyyaml</code></pre>
+    <p>Путь к Tesseract прописывается в <code>config.yaml</code> в блоке <code>tools</code>.</p>
+
+    <h2 id="sec5">5. Интерфейс</h2>
+    <p><strong>Левая панель:</strong> кнопки инструментов, тумблеры критика, настройки API.</p>
+    <p><strong>Правая панель:</strong> чат для общения с агентом на естественном языке (например: <em>"сделай резюме D:/Docs/report.docx"</em>).</p>
+
+    <h2 id="sec6">6. Роутер и Критик</h2>
+    <p><strong>Роутер</strong> — понимает ваши команды. Ищет ключевые слова (например, "напиши код"), если не находит — спрашивает LLM.</p>
+    <p><strong>Критик</strong> — проверяет ответы ИИ. Оценивает по шкале 1-10. Если оценка ниже 8, заставляет ИИ переписать ответ. Включается галочками в меню.</p>
+
+    <h2 id="sec7">7. Word Студия</h2>
+    <p>Кнопка «Студия стилей Word». Позволяет:</p>
+    <ul>
+        <li>Автоматически перенести ваши стили из шаблона в документ.</li>
+        <li>Сопоставить стили через ИИ.</li>
+        <li>Добавить нумерацию "Таблица 1", "Рисунок 1" для тех объектов, у которых нет названий.</li>
+    </ul>
+
+    <h2 id="sec9">9. Частые проблемы</h2>
+    <table>
+        <tr><th>Проблема</th><th>Решение</th></tr>
+        <tr><td>500 Server Error</td><td>Увеличьте Context Length в LM Studio (>= 4096)</td></tr>
+        <tr><td>Модель не найдена</td><td>Проверьте имя в config.yaml</td></tr>
+        <tr><td>Медленно работает</td><td>Отключите критика, используйте 7B модель</td></tr>
+    </table>
+
+    <div class="danger">
+        <strong>Безопасность:</strong> Агент никогда не изменяет оригинальные файлы. Все результаты сохраняются в папке <code>output/</code>.
+    </div>
+
+</body>
+</html>
