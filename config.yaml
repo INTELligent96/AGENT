@@ -28,8 +28,7 @@ tools:
   use_ms_office: true
 safety:
   read_only_originals: true
-  allowed_paths:
-  - D:/DEEPSEEK/AGENT/
+  allowed_paths: []
   workspace_dir: workspace
 agent_loop:
   max_iterations: 10
@@ -61,7 +60,7 @@ self_check:
   enabled: true
   force_always: false
   max_retries: 2
-  min_score: 8
+  min_score: 7
   critic_model: local_logic
   default_model_for_check: local_fast
 router:

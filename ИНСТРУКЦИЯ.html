@@ -2,101 +2,205 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>AI Document Agent PRO - Инструкция</title>
-    <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
-        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
-        h2 { color: #2980b9; margin-top: 30px; border-bottom: 1px solid #bdc3c7; padding-bottom: 5px; }
-        h3 { color: #16a085; }
-        p { margin-bottom: 15px; }
-        ul, ol { margin-bottom: 15px; padding-left: 20px; }
-        li { margin-bottom: 5px; }
-        code { background-color: #ecf0f1; color: #c0392b; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; }
-        pre { background-color: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; }
-        pre code { background-color: transparent; color: inherit; padding: 0; }
-        .alert { background-color: #ffeaa7; border-left: 5px solid #fdcb6e; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
-        .danger { background-color: #ff7675; color: white; border-left: 5px solid #d63031; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { border: 1px solid #bdc3c7; padding: 10px; text-align: left; }
-        th { background-color: #ecf0f1; font-weight: bold; }
-        .toc { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 30px; }
-        .toc a { text-decoration: none; color: #3498db; }
-        .toc a:hover { text-decoration: underline; }
-    </style>
+<meta charset="UTF-8">
+<title>AI Document Agent PRO v3</title>
+<style>
+body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #2c3e50; max-width: 950px; margin: 0 auto; padding: 20px; background: #f4f7f6; }
+h1 { border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+h2 { color: #2980b9; margin-top: 30px; border-bottom: 1px solid #bdc3c7; padding-bottom: 5px; }
+code { background: #ecf0f1; color: #c0392b; padding: 2px 6px; border-radius: 4px; font-family: Consolas; }
+pre { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 8px; overflow-x: auto; }
+pre code { background: transparent; color: inherit; }
+.alert { background: #ffeaa7; border-left: 5px solid #fdcb6e; padding: 15px; margin: 15px 0; border-radius: 4px; }
+.tip { background: #d4edda; border-left: 5px solid #28a745; padding: 15px; margin: 15px 0; border-radius: 4px; }
+.warn { background: #f8d7da; border-left: 5px solid #dc3545; padding: 15px; margin: 15px 0; border-radius: 4px; }
+table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+th, td { border: 1px solid #bdc3c7; padding: 10px; text-align: left; }
+th { background: #ecf0f1; }
+.toc { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin: 20px 0; }
+.toc a { color: #3498db; text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+.new-badge { background: #28a745; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin-left: 8px; }
+</style>
 </head>
 <body>
-    <h1>🤖 AI Document Agent PRO</h1>
-    <div class="toc">
-        <h3>Содержание</h3>
-        <ul>
-            <li><a href="#sec1">1. Что это и зачем</a></li>
-            <li><a href="#sec2">2. Требования к системе</a></li>
-            <li><a href="#sec3">3. Установка с нуля</a></li>
-            <li><a href="#sec4">4. Первый запуск</a></li>
-            <li><a href="#sec5">5. Интерфейс</a></li>
-            <li><a href="#sec6">6. Роутер и Критик</a></li>
-            <li><a href="#sec7">7. Word Студия</a></li>
-            <li><a href="#sec8">8. Добавление API</a></li>
-            <li><a href="#sec9">9. Частые проблемы</a></li>
-        </ul>
-    </div>
+<h1>🤖 AI Document Agent PRO <span style="font-size: 0.5em; color: #7f8c8d;">v3</span></h1>
 
-    <h2 id="sec1">1. Что это и зачем</h2>
-    <p>Локальный ИИ-агент для работы с документами Word, Excel, PDF и картинками.</p>
-    <ul>
-        <li>Поиск по локальным документам (RAG).</li>
-        <li>Суммаризация, проверка орфографии, написание кода.</li>
-        <li>Создание документов Word с сохранением ваших стилей.</li>
-        <li>Автоматическая нумерация таблиц и рисунков.</li>
-        <li>Сортировка файлов, графики в Excel, веб-поиск.</li>
-    </ul>
+<div class="alert">
+<strong>Что нового в v3:</strong>
+<ul>
+<li>Sandbox - ограничение разрешённых папок <span class="new-badge">NEW</span></li>
+<li>Поле «Лимит времени на задачу» в интерфейсе <span class="new-badge">NEW</span></li>
+<li>Кнопка «Сбросить базу RAG» <span class="new-badge">NEW</span></li>
+<li>История диалога (последние 5 пар) <span class="new-badge">NEW</span></li>
+<li>Диалог «Укажите папку» — агент ждёт путь <span class="new-badge">NEW</span></li>
+<li>Копирование и автосохранение чата <span class="new-badge">NEW</span></li>
+<li>Плагины — новые инструменты без правки ядра <span class="new-badge">NEW</span></li>
+</ul>
+</div>
 
-    <h2 id="sec2">2. Требования к системе</h2>
-    <table>
-        <tr><th>Компонент</th><th>Требование</th></tr>
-        <tr><td>ОС</td><td>Windows 10 / 11</td></tr>
-        <tr><td>Python</td><td>3.10</td></tr>
-        <tr><td>LM Studio</td><td>Порт 1235</td></tr>
-        <tr><td>Tesseract OCR</td><td>Языки rus + eng</td></tr>
-        <tr><td>MS Office</td><td>Word + Excel</td></tr>
-        <tr><td>RAM</td><td>От 16 ГБ</td></tr>
-    </table>
+<div class="toc">
+<strong>Содержание:</strong>
+<ol>
+<li><a href="#start">Быстрый старт</a></li>
+<li><a href="#sandbox">Sandbox (ограничение папок)</a></li>
+<li><a href="#timeout">Лимит времени</a></li>
+<li><a href="#history">История диалога</a></li>
+<li><a href="#pending">Диалог «Укажите папку»</a></li>
+<li><a href="#chat">Копирование/сохранение чата</a></li>
+<li><a href="#plugins">Плагины</a></li>
+<li><a href="#rag">Сброс RAG</a></li>
+<li><a href="#critic">Критик</a></li>
+<li><a href="#word">Word Студия</a></li>
+<li><a href="#api">API-модели</a></li>
+<li><a href="#problems">Частые проблемы</a></li>
+</ol>
+</div>
 
-    <h2 id="sec3">3. Установка с нуля</h2>
-    <div class="alert">
-        <strong>Внимание:</strong> Установите все библиотеки через <code>pip install</code>, а также Tesseract OCR и LM Studio.
-    </div>
-    <pre><code>pip install customtkinter python-docx openpyxl PyMuPDF pytesseract Pillow docxtpl xlrd pandas pywin32 chromadb sentence-transformers lxml ddgs xlsxwriter requests pyyaml</code></pre>
-    <p>Путь к Tesseract прописывается в <code>config.yaml</code> в блоке <code>tools</code>.</p>
+<h2 id="start">1. Быстрый старт</h2>
+<ol>
+<li>Установи библиотеки: <code>pip install -r requirements.txt</code></li>
+<li>Установи Tesseract OCR (языки rus + eng).</li>
+<li>LM Studio: загрузи модели, запусти Local Server на порту 1235.</li>
+<li>Проверь <code>config.yaml</code> — имена моделей должны совпадать.</li>
+<li>Запусти: <code>python main.py</code></li>
+</ol>
 
-    <h2 id="sec5">5. Интерфейс</h2>
-    <p><strong>Левая панель:</strong> кнопки инструментов, тумблеры критика, настройки API.</p>
-    <p><strong>Правая панель:</strong> чат для общения с агентом на естественном языке (например: <em>"сделай резюме D:/Docs/report.docx"</em>).</p>
+<h2 id="sandbox">2. Sandbox — ограничение папок</h2>
+<p>Правая панель, блок «🔒 Разрешённые директории».</p>
+<ul>
+<li><strong>Пусто</strong> = агент работает со всеми папками.</li>
+<li><strong>Список путей</strong> (по одному на строку) = разрешены только они и вложенные.</li>
+<li>Кнопка «Применить» сохраняет в <code>config.yaml</code>.</li>
+</ul>
+<div class="tip">
+<strong>Пример:</strong> введи<br>
+<code>D:/DEEPSEEK/AGENT/TEST_FULL</code><br>
+<code>D:/Documents/Work</code><br>
+Теперь агент не сможет прочитать <code>D:/Other/file.txt</code> — ответит «Путь вне разрешённых директорий».
+</div>
 
-    <h2 id="sec6">6. Роутер и Критик</h2>
-    <p><strong>Роутер</strong> — понимает ваши команды. Ищет ключевые слова (например, "напиши код"), если не находит — спрашивает LLM.</p>
-    <p><strong>Критик</strong> — проверяет ответы ИИ. Оценивает по шкале 1-10. Если оценка ниже 8, заставляет ИИ переписать ответ. Включается галочками в меню.</p>
+<h2 id="timeout">3. Лимит времени</h2>
+<p>Правая панель, поле «⏱ Лимит времени на задачу (сек)» + кнопка «Применить».</p>
+<ul>
+<li>По умолчанию <strong>600 секунд</strong> (10 минут).</li>
+<li>Минимум 30. Сохраняется в <code>config.yaml</code>.</li>
+<li>Проверяется <strong>между инструментами</strong>.</li>
+</ul>
+<div class="warn">
+<strong>Важно:</strong> если инструмент уже запущен (например, «пакетное резюме» на 50 файлов), он доработает до конца — таймаут не прервёт его посередине. Это сделано для безопасности файлов.
+</div>
 
-    <h2 id="sec7">7. Word Студия</h2>
-    <p>Кнопка «Студия стилей Word». Позволяет:</p>
-    <ul>
-        <li>Автоматически перенести ваши стили из шаблона в документ.</li>
-        <li>Сопоставить стили через ИИ.</li>
-        <li>Добавить нумерацию "Таблица 1", "Рисунок 1" для тех объектов, у которых нет названий.</li>
-    </ul>
+<h2 id="history">4. История диалога</h2>
+<p>Агент помнит <strong>последние 5 пар</strong> вопрос-ответ. Это позволяет:</p>
+<ul>
+<li>Спрашивать «а кто директор?» после «что в папке X?»</li>
+<li>Уточнять: «а ещё что-нибудь про это есть?»</li>
+</ul>
+<div class="tip">
+<strong>Пример:</strong><br>
+Вы: что в папке D:/Docs? в каком году основана компания?<br>
+Агент: 1995 (doc1.txt)<br>
+Вы: а кто директор?<br>
+Агент: Иван Иванов (doc1.txt) ← помнит контекст
+</div>
 
-    <h2 id="sec9">9. Частые проблемы</h2>
-    <table>
-        <tr><th>Проблема</th><th>Решение</th></tr>
-        <tr><td>500 Server Error</td><td>Увеличьте Context Length в LM Studio (>= 4096)</td></tr>
-        <tr><td>Модель не найдена</td><td>Проверьте имя в config.yaml</td></tr>
-        <tr><td>Медленно работает</td><td>Отключите критика, используйте 7B модель</td></tr>
-    </table>
+<h2 id="pending">5. Диалог «Укажите папку»</h2>
+<p>Если запрос требует путь, а ты его не указал — агент спросит.</p>
+<pre><code>Вы: сделай список файлов
+Агент: Укажите папку. Напишите путь следующим сообщением.
+Вы: D:/DEEPSEEK/AGENT/TEST_FULL
+Агент: (выполняет make_file_list)</code></pre>
 
-    <div class="danger">
-        <strong>Безопасность:</strong> Агент никогда не изменяет оригинальные файлы. Все результаты сохраняются в папке <code>output/</code>.
-    </div>
+<h2 id="chat">6. Копирование/сохранение чата</h2>
+<ul>
+<li>Кнопка <strong>«Копировать чат»</strong> — весь текст в буфер обмена.</li>
+<li>Кнопка <strong>«Сохранить чат в файл»</strong> — <code>output/chat_YYYYMMDD_HHMMSS.txt</code>.</li>
+<li>При закрытии окна — <strong>автосохранение</strong>.</li>
+</ul>
+<p>Все логи доступны в папке <code>output/</code>, файлы <code>chat_*.txt</code>. И в PyCharm (полные print()-логи).</p>
+
+<h2 id="plugins">7. Плагины</h2>
+<p>Папка <code>plugins/</code>. Каждый .py — один плагин.</p>
+<pre><code>from plugins.base import BasePlugin
+
+class MyPlugin(BasePlugin):
+    name = "my_plugin"
+    description = "Что делает"
+    keywords = ["запусти my_plugin"]
+    gui_enabled = True
+    gui_button_text = "Моя кнопка"
+    dangerous = False
+
+    def execute(self, user_text, agent):
+        path = agent._extract_path_from_text(user_text)
+        if not path:
+            return "Укажи файл."
+        text = agent._read_safe(path)
+        return "Длина: " + str(len(text))</code></pre>
+<p>Перезапусти агент — плагин появится в GUI и в чате.</p>
+
+<h2 id="rag">8. Сброс базы RAG</h2>
+<p>Кнопка <strong>«Сбросить базу RAG»</strong> в левой панели (красная).</p>
+<p><strong>Когда нужно:</strong></p>
+<ul>
+<li>В базе мусор от старых индексаций (видно по [RAG] Источники в логах).</li>
+<li>Сменил embedding-модель.</li>
+<li>RAG отвечает плохо.</li>
+</ul>
+<p><strong>После сброса:</strong> заново проиндексируй папку.</p>
+
+<h2 id="critic">9. Критик</h2>
+<p>Два тумблера в левой панели: «Включить критика» и «Всегда (даже для кода)».</p>
+<table>
+<tr><th>Режим</th><th>Что делает</th></tr>
+<tr><td>enabled=false</td><td>Критика нет, максимальная скорость</td></tr>
+<tr><td>enabled=true, force=false</td><td>Только для смысловых задач (RAG, резюме, перевод)</td></tr>
+<tr><td>enabled=true, force=true</td><td>Для всего, включая код. Максимально строго</td></tr>
+</table>
+<p><strong>Для RAG</strong> используется factual-check (проверка по контексту).</p>
+<p>Порог accept: <code>score >= 7</code>. Настраивается в config.yaml.</p>
+
+<h2 id="word">10. Word Студия</h2>
+<p>Кнопка «Студия стилей Word». Отдельное окно с 4 вкладками:</p>
+<ul>
+<li><strong>ИИ-соответствие</strong> — LLM сопоставит стили</li>
+<li><strong>Безопасная замена</strong> — жёсткие правила (Heading 1 → Заголовок 1)</li>
+<li><strong>Ручное</strong> — сам выбираешь стили из списков</li>
+<li><strong>Нумерация</strong> — добавит «Таблица N» и «Рисунок N» для объектов без номеров</li>
+</ul>
+<p>Оригинал <strong>никогда не меняется</strong>. Результаты в <code>output/</code>.</p>
+
+<h2 id="api">11. API-модели</h2>
+<p>Кнопка «Добавить LLM (API)» в настройках.</p>
+<p>Заполни: название, Base URL, API Key, имя модели. Сними галочку «Локальная» для внешних сервисов.</p>
+<p>Роутер автоматически ставит API-модель второй в цепочке fallback. Перезапусти приложение после добавления.</p>
+
+<h2 id="problems">12. Частые проблемы</h2>
+<table>
+<tr><th>Проблема</th><th>Решение</th></tr>
+<tr><td>500 Server Error</td><td>Увеличь Context Length в LM Studio (>= 4096)</td></tr>
+<tr><td>Модель не найдена</td><td>Проверь имя в config.yaml</td></tr>
+<tr><td>RAG не находит</td><td>«Сбросить базу RAG» → переиндексировать папку</td></tr>
+<tr><td>«Путь вне разрешённых»</td><td>Настрой Sandbox — добавь папку</td></tr>
+<tr><td>Чат не копируется</td><td>Кнопка «Копировать чат»</td></tr>
+<tr><td>Ctrl+V не работает</td><td>Кликни по полю ввода (фокус)</td></tr>
+<tr><td>Медленно</td><td>Отключи критика, используй 7B модели</td></tr>
+</table>
+
+<div class="tip">
+<strong>Чек-лист после установки:</strong>
+<ul>
+<li>[ ] LM Studio запущен на 1235</li>
+<li>[ ] Модели загружены</li>
+<li>[ ] config.yaml — имена совпадают</li>
+<li>[ ] Tesseract установлен (rus + eng)</li>
+<li>[ ] MS Office установлен</li>
+<li>[ ] pip install -r requirements.txt</li>
+<li>[ ] test_full_v2.py проходит</li>
+<li>[ ] main.py открывает интерфейс</li>
+</ul>
+</div>
 
 </body>
 </html>

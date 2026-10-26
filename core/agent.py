@@ -189,8 +189,15 @@ class Agent:
         tools = routing.get("tools", ["ask_question"])
         log("[Роутер] -> " + str(tools) + " (" + routing.get("reasoning", "") + ")")
 
+        start_time = time.time()
         results = []
         for tool_name in tools:
+            elapsed = time.time() - start_time
+            if elapsed > self.task_timeout:
+                msg = "Истекло время (" + str(int(self.task_timeout)) + " сек)"
+                log("[Таймаут] " + msg + " - прерываю")
+                results.append("=== ТАЙМАУТ ===\n" + msg)
+                break
             log("\n[Инструмент] " + tool_name)
             try:
                 result = self._execute_tool(tool_name, user_text, log)
@@ -214,10 +221,7 @@ class Agent:
             return self.ask_about_folder(user_text)
 
         if tool_name == "ask_question":
-            def gen(feedback):
-                base = user_text if not feedback else (user_text + "\n\n" + feedback)
-                return self.ask_question(base)
-            return self.critic.run_with_retry(gen, task=user_text, task_type="rag")
+            return self.ask_question_with_critic(user_text)
 
         if tool_name == "summarize_file":
             fp = self._extract_path_from_text(user_text)
@@ -307,6 +311,24 @@ class Agent:
         return None
 
     # ============ ИНСТРУМЕНТЫ ============
+    def ask_question_with_critic(self, question, folder_filter=None):
+        # Особый путь для RAG: сначала получаем чанки, потом критик проверяет по ним
+        search_query = self.rag._build_search_query(question, self.chat_history)
+        where = self.rag._get_source_filter(folder_filter)
+        chunks = self.rag.indexer.search(search_query, top_k=12, where=where)
+        if not chunks:
+            return 'В базе данных не найдено информации по этому вопросу.'
+        # Собираем контекст для критика
+        from pathlib import Path as _P
+        context_for_critic = ''
+        for c in chunks:
+            context_for_critic += c['text'] + '\n\n'
+        # Генерируем ответ через RAG
+        def gen(feedback):
+            q = question if not feedback else (question + '\n\n' + feedback)
+            return self.rag.ask(q, history=self.chat_history, last_folder=self.last_folder, folder_filter=folder_filter)
+        return self.critic.run_with_retry(gen, task=question, task_type='rag', context=context_for_critic)
+
     def ask_question(self, question, folder_filter=None):
         return self.rag.ask(question, history=self.chat_history, last_folder=self.last_folder, folder_filter=folder_filter)
 
@@ -462,6 +484,23 @@ class Agent:
             return 'База RAG очищена. Проиндексируйте папку заново.'
         except Exception as e:
             return '[Ошибка очистки]: ' + str(e)
+
+    def set_task_timeout(self, seconds):
+        try:
+            self.task_timeout = int(seconds)
+        except (ValueError, TypeError):
+            return 'Ошибка: введите целое число секунд'
+        if self.task_timeout < 30:
+            self.task_timeout = 30
+        if 'agent_loop' not in self.config:
+            self.config['agent_loop'] = {}
+        self.config['agent_loop']['task_timeout_seconds'] = self.task_timeout
+        try:
+            with open('config.yaml', 'w', encoding='utf-8') as f:
+                yaml.dump(self.config, f, allow_unicode=True, sort_keys=False)
+        except Exception as e:
+            return 'Ошибка сохранения: ' + str(e)
+        return 'Лимит времени: ' + str(self.task_timeout) + ' сек'
 
     def request_stop(self):
         self._stop_requested = True

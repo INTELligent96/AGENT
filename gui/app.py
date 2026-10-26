@@ -127,6 +127,14 @@ class AgentApp(ctk.CTk):
         ctk.CTkButton(chat_btns, text="Копировать чат", width=130, command=self.copy_chat).pack(side="left", padx=(0, 5))
         ctk.CTkButton(chat_btns, text="Сохранить чат в файл", width=170, command=self.save_chat_to_file).pack(side="left")
 
+        timeout_row = ctk.CTkFrame(self.sandbox_frame, fg_color="transparent")
+        timeout_row.pack(fill="x", padx=10, pady=(0, 8))
+        ctk.CTkLabel(timeout_row, text="⏱ Лимит времени на задачу (сек):").pack(side="left")
+        self.timeout_entry = ctk.CTkEntry(timeout_row, width=100)
+        self.timeout_entry.insert(0, str(self.agent.task_timeout))
+        self.timeout_entry.pack(side="left", padx=(10, 5))
+        ctk.CTkButton(timeout_row, text="Применить", width=100, command=self.save_timeout).pack(side="left")
+
         current = self.agent.allowed_paths
         if current:
             self.sandbox_text.insert("1.0", "\n".join(current))
@@ -314,6 +322,17 @@ class AgentApp(ctk.CTk):
             return
         result = self.agent.reset_rag_db()
         self.log('[Система] ' + result)
+
+    def save_timeout(self):
+        try:
+            val = int(self.timeout_entry.get())
+        except ValueError:
+            self.log("[Ошибка] Введите целое число секунд")
+            return
+        result = self.agent.set_task_timeout(val)
+        self.timeout_entry.delete(0, "end")
+        self.timeout_entry.insert(0, str(self.agent.task_timeout))
+        self.log("[Настройки] " + result)
 
     def stop_agent(self):
         self.agent.request_stop()
