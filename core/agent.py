@@ -41,6 +41,9 @@ class Agent:
 
         self.allowed_paths = [p.strip() for p in safety.get("allowed_paths", []) if str(p).strip()]
         self._indexed_folders = set()
+        self.pending_tool = None   # инструмент, ожидающий аргумент (папка/файл)
+        self.chat_history = []     # [{'role': 'user'/'assistant', 'content': '...'}, ...]
+        self.max_history = 5       # сколько последних пар хранить
 
         agent_loop = self.config.get("agent_loop", {})
         self.max_iterations = agent_loop.get("max_iterations", 10)
@@ -138,6 +141,13 @@ class Agent:
             if log_callback:
                 log_callback(msg)
 
+        # === Проверка: может быть, это ответ на 'Укажите папку/файл'? ===
+        if self.pending_tool:
+            resolved = self._try_resolve_pending(user_text, log)
+            if resolved is not None:
+                self._append_history(user_text, str(resolved))
+                return resolved
+
         log("[Роутер] Анализирую запрос...")
         routing = self.router.classify(user_text)
         tools = routing.get("tools", ["ask_question"])
@@ -176,7 +186,8 @@ class Agent:
         if tool_name == "summarize_file":
             fp = self._extract_path_from_text(user_text)
             if not fp:
-                return "Укажите файл: 'сделай резюме путь/к/файлу'"
+                self.pending_tool = 'summarize_file'
+                return "Укажите файл. Напишите путь следующим сообщением."
             def gen(feedback):
                 text = self._read_safe(fp)
                 prompt = SUMMARIZE_PROMPT.format(text=text[:8000])
@@ -188,7 +199,8 @@ class Agent:
         if tool_name == "check_spelling":
             fp = self._extract_path_from_text(user_text)
             if not fp:
-                return "Укажите файл: 'проверь ошибки путь/к/файлу'"
+                self.pending_tool = 'check_spelling'
+                return "Укажите файл. Напишите путь следующим сообщением."
             return self.check_spelling_file(fp)
 
         if tool_name == "generate_code":
@@ -196,17 +208,23 @@ class Agent:
 
         if tool_name == "batch_summarize":
             f = self._extract_folder_from_text(user_text) or self._extract_path_from_text(user_text)
-            if not f: return "Укажите папку."
+            if not f:
+                self.pending_tool = 'batch_summarize'
+                return "Укажите папку. Напишите путь следующим сообщением (например: D:/Docs) или повторите команду с путём."
             return self.batch_summarize(f)
 
         if tool_name == "classify_files":
             f = self._extract_folder_from_text(user_text)
-            if not f: return "Укажите папку."
+            if not f:
+                self.pending_tool = 'classify_files'
+                return "Укажите папку. Напишите путь следующим сообщением."
             return self.classify_files(f)
 
         if tool_name == "make_file_list":
             f = self._extract_folder_from_text(user_text)
-            if not f: return "Укажите папку."
+            if not f:
+                self.pending_tool = 'make_file_list'
+                return "Укажите папку. Напишите путь следующим сообщением."
             return self.make_file_list(f, recursive=True)
 
         if tool_name == "make_excel_chart":
@@ -254,7 +272,52 @@ class Agent:
 
     # ============ ИНСТРУМЕНТЫ ============
     def ask_question(self, question):
-        return self.rag.ask(question)
+        return self.rag.ask(question, history=self.chat_history)
+
+    def _append_history(self, user, assistant):
+        self.chat_history.append({'role': 'user', 'content': str(user)})
+        self.chat_history.append({'role': 'assistant', 'content': str(assistant)})
+        # Обрезаем по парам
+        max_len = self.max_history * 2
+        if len(self.chat_history) > max_len:
+            self.chat_history = self.chat_history[-max_len:]
+
+    def _try_resolve_pending(self, user_text, log):
+        tool = self.pending_tool
+        arg = user_text.strip().strip('"').strip("'")
+
+        # Если в тексте есть команда (а не только путь) — отдаём роутеру
+        lower = user_text.lower()
+        command_words = ['проверь', 'сделай', 'напиши', 'построй', 'найди', 'создай', 'посчитай', 'переведи', 'отсортируй', 'разложи']
+        if any(w in lower for w in command_words):
+            self.pending_tool = None
+            return None
+
+        self.pending_tool = None
+        log('[Диалог] Использую введённый путь: ' + arg)
+
+        try:
+            if tool == 'make_file_list':
+                return self.make_file_list(arg, recursive=True)
+            if tool == 'classify_files':
+                return self.classify_files(arg)
+            if tool == 'batch_summarize':
+                return self.batch_summarize(arg)
+            if tool == 'index_folder':
+                return self.index_folder(arg)
+            if tool == 'make_excel_chart':
+                return self.make_excel_chart(arg)
+            if tool == 'summarize_file':
+                return self.summarize_file(arg)
+            if tool == 'check_spelling':
+                return self.check_spelling_file(arg)
+            if tool == 'process_long_doc':
+                return self.process_long_document(arg)
+            if tool == 'ask_about_folder':
+                return self.ask_about_folder('что в папке ' + arg + '?')
+        except Exception as e:
+            return '[Ошибка] ' + str(e)
+        return None
 
     def check_spelling_file(self, file_path):
         text = self._read_safe(file_path)

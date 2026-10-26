@@ -1,6 +1,7 @@
 ﻿Имя файла;Папка;Размер (байт);Расширение
-bad.txt;TEST_FULL;72;.txt
-big_book.txt;TEST_FULL;8959;.txt
-contract.docx;TEST_FULL;36650;.docx
-doc1.txt;TEST_FULL;120;.txt
-sales.xlsx;TEST_FULL;4951;.xlsx
+bad.txt;D:\DEEPSEEK\AGENT\TEST_FULL;72;.txt
+big_book.txt;D:\DEEPSEEK\AGENT\TEST_FULL;8959;.txt
+contract.docx;D:\DEEPSEEK\AGENT\TEST_FULL;36650;.docx
+doc1.txt;D:\DEEPSEEK\AGENT\TEST_FULL;120;.txt
+sales.xlsx;D:\DEEPSEEK\AGENT\TEST_FULL;4951;.xlsx
+styled_doc.docx;D:\DEEPSEEK\AGENT\TEST_FULL;36641;.docx

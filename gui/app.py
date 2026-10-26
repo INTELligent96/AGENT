@@ -98,6 +98,15 @@ class AgentApp(ctk.CTk):
         self.btn_send = ctk.CTkButton(self.input_frame, text="Отправить", width=100, command=self.send_message)
         self.btn_send.grid(row=0, column=1)
 
+        self.protocol("WM_DELETE_WINDOW", self._on_closing)
+
+    def _on_closing(self):
+        try:
+            self.save_chat_to_file()
+        except Exception:
+            pass
+        self.destroy()
+
     def _build_sandbox_bar(self):
         label = ctk.CTkLabel(self.sandbox_frame, text="🔒 Разрешённые директории (по одной на строку, пусто = без ограничений):", font=("Arial", 12))
         label.pack(anchor="w", padx=10, pady=(8, 0))
@@ -111,6 +120,11 @@ class AgentApp(ctk.CTk):
         btn = ctk.CTkButton(row, text="Применить", width=110, command=self.save_sandbox_paths)
         btn.pack(side="right")
         ToolTip(btn, "Сохранить список разрешённых папок. Агент не сможет работать с файлами вне их.")
+
+        chat_btns = ctk.CTkFrame(self.sandbox_frame, fg_color="transparent")
+        chat_btns.pack(fill="x", padx=10, pady=(0, 8))
+        ctk.CTkButton(chat_btns, text="Копировать чат", width=130, command=self.copy_chat).pack(side="left", padx=(0, 5))
+        ctk.CTkButton(chat_btns, text="Сохранить чат в файл", width=170, command=self.save_chat_to_file).pack(side="left")
 
         current = self.agent.allowed_paths
         if current:
@@ -150,7 +164,34 @@ class AgentApp(ctk.CTk):
             self.chat_display.insert("end", text + "\n")
             self.chat_display.see("end")
             self.chat_display.configure(state="disabled")
+            try:
+                self.user_input.focus_set()
+            except Exception:
+                pass
         self.after(0, _update)
+
+    def copy_chat(self):
+        try:
+            text = self.chat_display.get("1.0", "end")
+            self.clipboard_clear()
+            self.clipboard_append(text)
+            self.log("[Система] Чат скопирован в буфер обмена.")
+        except Exception as e:
+            self.log("[Ошибка] Не удалось скопировать: " + str(e))
+
+    def save_chat_to_file(self):
+        from datetime import datetime
+        import os as _os
+        try:
+            _os.makedirs(self.agent.output_dir, exist_ok=True)
+            fname = "chat_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".txt"
+            fpath = _os.path.join(self.agent.output_dir, fname)
+            text = self.chat_display.get("1.0", "end")
+            with open(fpath, "w", encoding="utf-8") as f:
+                f.write(text)
+            self.log("[Система] Чат сохранён: " + fpath)
+        except Exception as e:
+            self.log("[Ошибка] Не удалось сохранить: " + str(e))
 
     def run_in_thread(self, func, *args):
         def wrapper():
@@ -211,6 +252,10 @@ class AgentApp(ctk.CTk):
         def task():
             result = self.agent.run_task(text, log_callback=self.log)
             self.log("\nАгент: " + result)
+            try:
+                self.agent._append_history(text, result)
+            except Exception:
+                pass
         threading.Thread(target=task, daemon=True).start()
 
     def open_style_studio(self):
