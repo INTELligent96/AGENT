@@ -12,6 +12,7 @@ from tools.validator import validate_python_code
 from tools.file_manager import generate_file_list
 from tools.excel_tools import create_excel_chart
 from tools.web_search import search_web
+from tools.long_doc import LongDocumentProcessor
 from rag.qa import RAGQuestionAnswerer
 
 class Agent:
@@ -44,37 +45,36 @@ class Agent:
             self._rag = RAGQuestionAnswerer(self.config, self.tools, self.registry)
         return self._rag
 
+    # --- ДЛИННЫЕ ДОКУМЕНТЫ ---
+    def process_long_document(self, file_path: str) -> str:
+        processor = LongDocumentProcessor(self.config, self.tools, self.registry, self.output_dir)
+        return processor.process(file_path)
+
     # --- НОВЫЕ ИНСТРУМЕНТЫ ---
     def make_file_list(self, folder_path: str, recursive: bool) -> str:
-        print(f"Генерация списка файлов: {folder_path}")
         return generate_file_list(folder_path, recursive, self.output_dir)
 
     def make_excel_chart(self, file_path: str) -> str:
-        print(f"Создание графика для: {file_path}")
         return create_excel_chart(file_path, self.output_dir)
 
     def classify_files(self, folder_path: str) -> str:
-        """Сортирует файлы по категориям (копирует, не двигает)."""
         folder = Path(folder_path)
         sorted_dir = Path(self.output_dir) / f"sorted_{folder.name}"
         sorted_dir.mkdir(parents=True, exist_ok=True)
 
         files = [f for f in folder.iterdir() if f.is_file()]
         for f in files:
-            text = extract_text(str(f), self.tools)[:2000] # Берем кусок для анализа
+            text = extract_text(str(f), self.tools)[:2000]
             prompt = f"Определи категорию документа (одним словом: Договор, Счет, Отчет, Письмо, Прочее). Текст: {text}"
             category = self.registry.generate_with_fallback("default_model", prompt).strip()
-            # Очищаем от мусора
             category = category.split()[0].replace('.', '').replace('"', '').replace("'", "")
 
             cat_dir = sorted_dir / category
             cat_dir.mkdir(exist_ok=True)
             shutil.copy2(f, cat_dir / f.name)
-
         return str(sorted_dir)
 
     def batch_summarize(self, folder_path: str) -> str:
-        """Делает резюме для всех файлов и собирает в один Word."""
         folder = Path(folder_path)
         files = [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() in ['.txt', '.docx', '.pdf']]
 
@@ -82,7 +82,6 @@ class Agent:
         for f in files:
             text = self._read_safe(str(f))
             if text.startswith("[Ошибка]"): continue
-
             prompt = SUMMARIZE_PROMPT.format(text=text[:6000])
             summary = self.registry.generate_with_fallback("default_model", prompt)
             final_text += f"=== РЕЗЮМЕ ФАЙЛА: {f.name} ===\n{summary}\n\n"
@@ -92,7 +91,6 @@ class Agent:
         return str(out_file)
 
     def web_search(self, query: str) -> str:
-        print(f"Поиск в интернете: {query}")
         return search_web(query)
 
     # --- БАЗОВЫЕ МЕТОДЫ ---

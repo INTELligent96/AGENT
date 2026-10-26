@@ -5,6 +5,7 @@ from tkinter import filedialog, messagebox
 from core.agent import Agent
 from gui.config_manager import add_llm_profile
 from gui.tooltip import ToolTip
+from gui.style_manager import StyleManagerWindow
 
 class AgentApp(ctk.CTk):
     def __init__(self):
@@ -16,39 +17,35 @@ class AgentApp(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # --- ЛЕВАЯ ПАНЕЛЬ (Скроллинг) ---
         self.sidebar = ctk.CTkScrollableFrame(self, width=250, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
         self.logo_label = ctk.CTkLabel(self.sidebar, text="AGENT PANEL", font=ctk.CTkFont(size=22, weight="bold"))
         self.logo_label.pack(padx=20, pady=(20, 10))
 
-        # 1. Базовые функции
         ctk.CTkLabel(self.sidebar, text="Базовые функции:", font=("Arial", 14, "bold"), text_color="gray").pack(pady=(10, 0), anchor="w", padx=20)
-
         self._add_btn("Индексировать папку", self.index_folder, "Прочитать файлы для RAG-поиска")
         self._add_btn("Проверить орфографию", self.check_spell, "Найти ошибки в файле")
         self._add_btn("Написать код", self.write_code, "Сгенерировать и проверить Python-код")
+        self._add_btn("Полный разбор документа", self.process_long_doc, "Резюме больших книг/PDF с чекпоинтами", color="#8A2BE2")
 
-        # 2. Инструменты
-        ctk.CTkLabel(self.sidebar, text="Инструменты:", font=("Arial", 14, "bold"), text_color="gray").pack(pady=(20, 0), anchor="w", padx=20)
+        ctk.CTkLabel(self.sidebar, text="Инструменты Word:", font=("Arial", 14, "bold"), text_color="gray").pack(pady=(20, 0), anchor="w", padx=20)
+        self._add_btn("Студия стилей Word", self.open_style_studio, "Замена стилей, нумерация таблиц и рисунков", color="#B8860B")
 
+        ctk.CTkLabel(self.sidebar, text="Данные и поиск:", font=("Arial", 14, "bold"), text_color="gray").pack(pady=(20, 0), anchor="w", padx=20)
         self._add_btn("Список файлов (CSV)", self.make_file_list_ui, "Создать список всех файлов в папке")
         self._add_btn("График в Excel", self.make_excel_chart_ui, "Создать график по данным из Excel")
         self._add_btn("Пакетное резюме", self.batch_summary_ui, "Сделать резюме для всех файлов в папке")
         self._add_btn("Сортировка файлов", self.classify_ui, "Разложить файлы по категориям")
         self._add_btn("Веб-поиск", self.web_search_ui, "Найти информацию в интернете")
 
-        # 3. Настройки
         ctk.CTkLabel(self.sidebar, text="Настройки:", font=("Arial", 14, "bold"), text_color="gray").pack(pady=(20, 0), anchor="w", padx=20)
         self._add_btn("Добавить LLM (API)", self.open_add_llm_window, "Подключить внешнюю модель", color="green")
 
-        # Кнопка СТОП в самом низу (не в скролле)
         self.btn_stop = ctk.CTkButton(self, text="ЭКСТРЕННЫЙ СТОП", fg_color="red", hover_color="darkred", command=self.stop_agent)
         self.btn_stop.grid(row=0, column=0, sticky="sw", padx=20, pady=20)
         ToolTip(self.btn_stop, "Остановить агента, сохранив последний результат")
 
-        # --- ПРАВАЯ ПАНЕЛЬ (Чат) ---
         self.chat_frame = ctk.CTkFrame(self)
         self.chat_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
         self.chat_frame.grid_rowconfigure(0, weight=1)
@@ -70,7 +67,7 @@ class AgentApp(ctk.CTk):
 
     def _add_btn(self, text, command, hint, color=None):
         btn = ctk.CTkButton(self.sidebar, text=text, command=command)
-        if color: btn.configure(fg_color=color, hover_color="darkgreen")
+        if color: btn.configure(fg_color=color, hover_color="darkgreen" if color=="green" else "#4B0082")
         btn.pack(padx=20, pady=5, fill="x")
         ToolTip(btn, hint)
 
@@ -88,7 +85,10 @@ class AgentApp(ctk.CTk):
             except Exception as e: self.log(f"\n[ОШИБКА]: {str(e)}\n")
         threading.Thread(target=wrapper, daemon=True).start()
 
-    # --- ОБРАБОТЧИКИ КНОПОК ---
+    def open_style_studio(self):
+        StyleManagerWindow(self, self.agent)
+
+    # ... остальные методы (index_folder, check_spell и т.д.) оставляем без изменений ...
     def index_folder(self):
         folder = filedialog.askdirectory(title="Выберите папку")
         if folder: self.run_in_thread(lambda: self.log("[ИНДЕКСАЦИЯ] " + str(self.agent.index_folder(folder))))
@@ -100,6 +100,10 @@ class AgentApp(ctk.CTk):
     def write_code(self):
         task = ctk.CTkInputDialog(text="Опишите задачу:", title="Код").get_input()
         if task: self.run_in_thread(lambda: self.log(self.agent.generate_code_with_validation(task)))
+
+    def process_long_doc(self):
+        file_path = filedialog.askopenfilename(title="Выберите большой документ")
+        if file_path: self.run_in_thread(lambda: self.log(self.agent.process_long_document(file_path)))
 
     def make_file_list_ui(self):
         folder = filedialog.askdirectory(title="Выберите папку для списка")
@@ -140,21 +144,14 @@ class AgentApp(ctk.CTk):
         win.geometry("450x400")
         win.attributes("-topmost", True)
 
-        ctk.CTkLabel(win, text="Название профиля (например, deepseek_api):").pack(pady=(10,0))
-        entry_name = ctk.CTkEntry(win, width=350)
-        entry_name.pack()
-
+        ctk.CTkLabel(win, text="Название профиля:").pack(pady=(10,0))
+        entry_name = ctk.CTkEntry(win, width=350); entry_name.pack()
         ctk.CTkLabel(win, text="Base URL:").pack(pady=(10,0))
-        entry_url = ctk.CTkEntry(win, width=350)
-        entry_url.pack()
-
+        entry_url = ctk.CTkEntry(win, width=350); entry_url.pack()
         ctk.CTkLabel(win, text="API Key:").pack(pady=(10,0))
-        entry_key = ctk.CTkEntry(win, width=350, show="*")
-        entry_key.pack()
-
-        ctk.CTkLabel(win, text="Имя модели (например, deepseek-chat):").pack(pady=(10,0))
-        entry_model = ctk.CTkEntry(win, width=350)
-        entry_model.pack()
+        entry_key = ctk.CTkEntry(win, width=350, show="*"); entry_key.pack()
+        ctk.CTkLabel(win, text="Имя модели:").pack(pady=(10,0))
+        entry_model = ctk.CTkEntry(win, width=350); entry_model.pack()
 
         is_local_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(win, text="Это локальная модель?", variable=is_local_var).pack(pady=10)
@@ -165,7 +162,7 @@ class AgentApp(ctk.CTk):
                 messagebox.showerror("Ошибка", "Заполните все обязательные поля!")
                 return
             add_llm_profile(name, url, key, model, is_local_var.get())
-            messagebox.showinfo("Успех", f"Модель {name} добавлена в config.yaml! Перезапустите приложение.")
+            messagebox.showinfo("Успех", f"Модель {name} добавлена! Перезапустите приложение.")
             win.destroy()
 
         ctk.CTkButton(win, text="Сохранить", command=save).pack(pady=20)

@@ -1,8 +1,10 @@
-from duckduckgo_search import DDGS
+from ddgs import DDGS
+
 
 def search_web(query: str, max_results: int = 3) -> str:
     """Ищет информацию в интернете."""
     try:
+        # В новой библиотеке ddgs синтаксис почти такой же
         results = DDGS().text(query, max_results=max_results)
         if not results:
             return "Ничего не найдено в интернете."

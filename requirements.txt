@@ -31,3 +31,6 @@ customtkinter
 pandas
 xlsxwriter
 duckduckgo-search
+ddgs
+lxml
+
