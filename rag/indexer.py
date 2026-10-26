@@ -123,11 +123,15 @@ class RAGIndexer:
         print(f"✅ Индексация завершена! Обработано документов: {doc_id_counter}")
         return doc_id_counter
 
-    def search(self, query: str, top_k: int = 4) -> list[dict]:
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=top_k
-        )
+    def search(self, query: str, top_k: int = 4, where: dict = None) -> list[dict]:
+        kwargs = {'query_texts': [query], 'n_results': top_k}
+        if where:
+            kwargs['where'] = where
+        try:
+            results = self.collection.query(**kwargs)
+        except Exception as e:
+            print('  [RAG] where-фильтр не сработал: ' + str(e))
+            results = self.collection.query(query_texts=[query], n_results=top_k)
 
         found_chunks = []
         if results['documents']:

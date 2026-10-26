@@ -44,6 +44,7 @@ class Agent:
         self.pending_tool = None   # инструмент, ожидающий аргумент (папка/файл)
         self.chat_history = []     # [{'role': 'user'/'assistant', 'content': '...'}, ...]
         self.max_history = 5       # сколько последних пар хранить
+        self.last_folder = None    # папка последнего ask_about_folder
 
         agent_loop = self.config.get("agent_loop", {})
         self.max_iterations = agent_loop.get("max_iterations", 10)
@@ -119,20 +120,55 @@ class Agent:
         if err:
             return err
         abs_folder = os.path.abspath(folder)
+        self.last_folder = folder   # запоминаем для контекста следующих вопросов
         if abs_folder not in self._indexed_folders:
             print("[Auto-Index] Индексирую папку: " + folder)
             self.rag.indexer.index_folder(folder)
             self._indexed_folders.add(abs_folder)
+
+        # === Получаем список файлов для явного перечисления ===
+        file_list_text = ""
+        lower_text = user_text.lower()
+        wants_file_list = any(kw in lower_text for kw in [
+            "что в папке", "что находится", "список файлов", "какие файлы",
+            "покажи файлы", "перечень", "содержимое папки", "обзор папки"
+        ])
+        if wants_file_list:
+            try:
+                from pathlib import Path as _P
+                all_files = [f for f in _P(folder).rglob('*') if f.is_file()]
+                if all_files:
+                    file_list_text = "Файлы в папке " + folder + ":\n"
+                    for f in all_files[:30]:
+                        file_list_text += "- " + f.name + "\n"
+                    if len(all_files) > 30:
+                        file_list_text += "... и ещё " + str(len(all_files) - 30) + " файлов\n"
+            except Exception as e:
+                file_list_text = "[Не удалось получить список: " + str(e) + "]\n"
+
         question = user_text.replace(folder, "").strip()
-        # Убираем общие слова про папку, чтобы понять, есть ли специфичный вопрос
-        generic = ["расскажи", "кратко", "обзор", "покажи", "о папке", "про папку", "что в", "что находится", "проанализируй", "опиши", "дай обзор", "перескажи", "папке", "папки", "папку", "каталоге", "каталог"]
+        generic = ["расскажи", "кратко", "обзор", "покажи", "о папке", "про папку", "что в", "что находится", "проанализируй", "опиши", "дай обзор", "перескажи", "папке", "папки", "папку", "каталоге", "каталог", "содержимое", "содержимом"]
         specific = question
         for gw in generic:
             specific = specific.replace(gw, " ")
         specific = specific.strip(" ?!.,;:\t\n")
+
+        # Если специфичного вопроса нет - только файлы + общий обзор
         if len(specific) < 5:
-            question = "Сделай краткий обзор содержимого этих документов. Какие темы/вопросы они освещают?"
-        return self.ask_question(question)
+            if file_list_text:
+                question = "Сделай краткий обзор содержимого этих документов: какие темы, ключевые факты и вопросы они освещают?"
+                rag_answer = self.ask_question(question, folder_filter=folder)
+                return file_list_text + "\n--- Обзор содержимого ---\n" + rag_answer
+            else:
+                question = "Сделай краткий обзор содержимого этих документов. Какие темы/вопросы они освещают?"
+        else:
+            question = specific
+
+        # Если есть специфичный вопрос - RAG-ответ + (опционально) список файлов сверху
+        rag_answer = self.ask_question(question)
+        if file_list_text:
+            return file_list_text + "\n--- Ответ на вопрос ---\n" + rag_answer
+        return rag_answer
 
     # ============ ГЛАВНЫЙ ОРКЕСТРАТОР ============
     def run_task(self, user_text, log_callback=None):
@@ -271,8 +307,8 @@ class Agent:
         return None
 
     # ============ ИНСТРУМЕНТЫ ============
-    def ask_question(self, question):
-        return self.rag.ask(question, history=self.chat_history)
+    def ask_question(self, question, folder_filter=None):
+        return self.rag.ask(question, history=self.chat_history, last_folder=self.last_folder, folder_filter=folder_filter)
 
     def _append_history(self, user, assistant):
         self.chat_history.append({'role': 'user', 'content': str(user)})
@@ -413,6 +449,19 @@ class Agent:
         result = self.rag.indexer.index_folder(folder_path)
         self._indexed_folders.add(os.path.abspath(folder_path))
         return result
+
+    def reset_rag_db(self):
+        try:
+            import shutil
+            db_path = self.config.get('rag', {}).get('db_path', 'chroma_db')
+            if os.path.exists(db_path):
+                shutil.rmtree(db_path)
+                print('[RAG] База данных удалена: ' + db_path)
+            self._rag = None
+            self._indexed_folders.clear()
+            return 'База RAG очищена. Проиндексируйте папку заново.'
+        except Exception as e:
+            return '[Ошибка очистки]: ' + str(e)
 
     def request_stop(self):
         self._stop_requested = True

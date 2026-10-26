@@ -57,6 +57,7 @@ class AgentApp(ctk.CTk):
         self._add_btn("График в Excel", self.make_excel_chart_ui, "Построить график")
         self._add_btn("Пакетное резюме", self.batch_summary_ui, "Резюме папки в Word")
         self._add_btn("Сортировка файлов", self.classify_ui, "Разложить по категориям")
+        self._add_btn("Сбросить базу RAG", self.reset_rag_ui, "Удалить базу и начать заново", color="#B22222")
         self._add_btn("Веб-поиск", self.web_search_ui, "Поиск в интернете")
 
         gui_plugins = {n: p for n, p in self.agent.plugins.items() if getattr(p, "gui_enabled", False)}
@@ -307,6 +308,12 @@ class AgentApp(ctk.CTk):
         q = ctk.CTkInputDialog(text="Запрос:", title="Поиск").get_input()
         if q:
             self.run_in_thread(lambda: self.log(self.agent.web_search(q)))
+
+    def reset_rag_ui(self):
+        if not messagebox.askyesno('Подтверждение', 'Удалить базу RAG?\nПридётся переиндексировать папки.'):
+            return
+        result = self.agent.reset_rag_db()
+        self.log('[Система] ' + result)
 
     def stop_agent(self):
         self.agent.request_stop()
