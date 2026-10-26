@@ -28,6 +28,8 @@ tools:
   use_ms_office: true
 safety:
   read_only_originals: true
+  allowed_paths:
+  - D:/DEEPSEEK/AGENT/
   workspace_dir: workspace
 agent_loop:
   max_iterations: 10
@@ -69,3 +71,6 @@ router:
   - batch_summarize
   - index_folder
   - make_file_list
+startup:
+  check_dependencies: true
+  auto_install: false

@@ -1,36 +1,20 @@
-free-deepseek-api
-playwright
-pypdf
-python-docx
-excelreader-native
-pyexcel
-xlrd
-openpyxl
-Pillow
-pytesseract
-typer
-fastapi
-uvicorn
-python-dotenv
-pytest
-pytest-asyncio
-python-multipart
-playwright-stealth
-requests pyyaml
-openpyxl
-PyMuPDF
-pytesseract
-Pillow
-docxtpl
-xlrd
-pandas
-pywin32
-chromadb
-sentence-transformers
-customtkinter
-pandas
-xlsxwriter
-duckduckgo-search
-ddgs
-lxml
+# AI Document Agent PRO - полный список зависимостей
+# Установка: pip install -r requirements.txt
 
+customtkinter>=5.2.0
+python-docx>=1.1.0
+openpyxl>=3.1.0
+PyMuPDF>=1.23.0
+pytesseract>=0.3.10
+Pillow>=10.0.0
+docxtpl>=0.16.0
+xlrd>=2.0.0
+pandas>=2.0.0
+pywin32>=306
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+lxml>=4.9.0
+ddgs>=0.1.0
+xlsxwriter>=3.1.0
+requests>=2.28.0
+pyyaml>=6.0

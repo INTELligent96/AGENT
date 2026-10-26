@@ -483,11 +483,7 @@ if __name__ == "__main__":
 1. **Python 3.10+**
 2. **LM Studio** — загрузите модели и включите Local Server (порт 1235)
 3. **Tesseract OCR** (для картинок): установите с языками `rus` и `eng`
-4. **Microsoft Office** (или LibreOffice) для старых `.doc`/`.xls`
-
-```bash
-pip install -r requirements.txt
-python main.py
- 
- '''\ ,
+4. **Microsoft Office** (или LibreOffice) для старых `.doc`/`.xls` 
+""",
 }
+
