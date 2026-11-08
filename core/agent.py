@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import yaml
 import shutil
@@ -93,24 +94,6 @@ class Agent:
         with open("config.yaml", "w", encoding="utf-8") as f:
             yaml.dump(self.config, f, allow_unicode=True, sort_keys=False)
 
-    def _extract_folder_from_text(self, text):
-        bad = ("\"", "'", "`", "(", ")", "[", "]", "{", "}", "<", ">", ",", ";", "!", "?")
-        for raw in text.split():
-            t = raw
-            ch = True
-            while ch and t:
-                ch = False
-                if t[0] in bad:
-                    t = t[1:]
-                    ch = True
-                if t and t[-1] in bad:
-                    t = t[:-1]
-                    ch = True
-            if not t:
-                continue
-            if os.path.isdir(t):
-                return t
-        return None
 
     def ask_about_folder(self, user_text):
         folder = self._extract_folder_from_text(user_text)
@@ -218,7 +201,10 @@ class Agent:
                 return "[Ошибка плагина " + plugin.name + "]: " + str(e)
 
         if tool_name == "ask_about_folder":
-            return self.ask_about_folder(user_text)
+            result = self.ask_about_folder(user_text)
+            if isinstance(result, str) and result.startswith("Укажите существующую папку"):
+                self.pending_tool = 'ask_about_folder'
+            return result
 
         if tool_name == "ask_question":
             return self.ask_question_with_critic(user_text)
@@ -290,9 +276,84 @@ class Agent:
 
         return "[Неизвестный инструмент: " + tool_name + "]"
 
+
+    def _extract_folder_from_text(self, text):
+        # 1. Если весь текст (обрезанный) — существующая папка
+        cleaned = text.strip().strip('"').strip("'").strip('`').strip()
+        try:
+            if cleaned and os.path.isdir(cleaned):
+                return cleaned
+        except Exception:
+            pass
+
+        # 2. Ищем все вхождения 'X:\' или 'X:/'
+        for m in re.finditer(r'[A-Za-z]:[\\/][^\n\r]*', text):
+            raw = m.group(0)
+            # Убираем завершающие кавычки и пунктуацию
+            raw = raw.rstrip('"\';,?!)]}>')
+            parts = raw.split(' ')
+            # От длинного к короткому — ищем существующую папку
+            for i in range(len(parts), 0, -1):
+                candidate = ' '.join(parts[:i]).strip()
+                if candidate:
+                    try:
+                        if os.path.isdir(candidate):
+                            return candidate
+                    except Exception:
+                        pass
+
+        # 3. Fallback: старое поведение (отдельные токены без пробелов)
+        bad = ('"', "'", '`', '(', ')', '[', ']', '{', '}', '<', '>', ',', ';', '!', '?')
+        for raw in text.split():
+            t = raw
+            ch = True
+            while ch and t:
+                ch = False
+                if t[0] in bad:
+                    t = t[1:]
+                    ch = True
+                if t and t[-1] in bad:
+                    t = t[:-1]
+                    ch = True
+            if not t:
+                continue
+            try:
+                if os.path.isdir(t):
+                    return t
+            except Exception:
+                pass
+        return None
+
     def _extract_path_from_text(self, text):
-        exts = ('.txt', '.docx', '.doc', '.pdf', '.xlsx', '.xls', '.csv', '.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.py', '.json', '.md', '.html', '.xml', '.yaml', '.yml', '.ini', '.log', '.bat', '.ps1', '.sh', '.rtf', '.odt')
-        bad = ("\"", "'", "`", "(", ")", "[", "]", "{", "}", "<", ">", ",", ";", ":", "!", "?")
+        exts = ('.txt', '.docx', '.doc', '.pdf', '.xlsx', '.xls', '.csv',
+                '.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.py', '.json', '.md',
+                '.html', '.xml', '.yaml', '.yml', '.ini', '.log', '.bat', '.ps1',
+                '.sh', '.rtf', '.odt')
+
+        # 1. Если весь текст — существующий файл
+        cleaned = text.strip().strip('"').strip("'").strip('`').strip()
+        try:
+            if cleaned and os.path.isfile(cleaned):
+                return cleaned
+        except Exception:
+            pass
+
+        # 2. Ищем 'X:\...' и 'X:/...'
+        for m in re.finditer(r'[A-Za-z]:[\\/][^\n\r]*', text):
+            raw = m.group(0)
+            raw = raw.rstrip('"\';,?!)]}>')
+            parts = raw.split(' ')
+            for i in range(len(parts), 0, -1):
+                candidate = ' '.join(parts[:i]).strip()
+                if candidate and candidate.lower().endswith(exts):
+                    try:
+                        if os.path.isfile(candidate):
+                            return candidate
+                    except Exception:
+                        pass
+
+        # 3. Fallback: отдельные токены
+        bad = ('"', "'", '`', '(', ')', '[', ']', '{', '}', '<', '>', ',', ';', ':', '!', '?')
         for raw in text.split():
             t = raw
             ch = True
@@ -310,7 +371,6 @@ class Agent:
                 return t
         return None
 
-    # ============ ИНСТРУМЕНТЫ ============
     def ask_question_with_critic(self, question, folder_filter=None):
         # Особый путь для RAG: сначала получаем чанки, потом критик проверяет по ним
         search_query = self.rag._build_search_query(question, self.chat_history)
@@ -372,7 +432,7 @@ class Agent:
             if tool == 'process_long_doc':
                 return self.process_long_document(arg)
             if tool == 'ask_about_folder':
-                return self.ask_about_folder('что в папке ' + arg + '?')
+                return self.ask_about_folder(arg)
         except Exception as e:
             return '[Ошибка] ' + str(e)
         return None

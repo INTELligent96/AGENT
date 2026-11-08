@@ -28,11 +28,12 @@ tools:
   use_ms_office: true
 safety:
   read_only_originals: true
-  allowed_paths: []
+  allowed_paths:
+  - D:\DEEPSEEK\ДАННЫЕ ДЛЯ АГЕНТА\ТЭО с подсчетом запасов Черногорского_2010\
   workspace_dir: workspace
 agent_loop:
   max_iterations: 10
-  task_timeout_seconds: 600
+  task_timeout_seconds: 1200
   code_execution_timeout: 15
   max_tokens_default: 4096
   retry_attempts: 2

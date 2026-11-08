@@ -5,17 +5,25 @@ from docx import Document
 import openpyxl
 import pytesseract
 from PIL import Image
-from .legacy import convert_legacy_ms_office
+from .legacy import convert_legacy_ms_office, LegacyConversionError, COM_AVAILABLE
 
 def extract_text(file_path: str, tools_config: dict) -> str:
     ext = Path(file_path).suffix.lower()
 
     if ext in ['.doc', '.xls']:
-        if tools_config.get("use_ms_office"):
-            file_path = convert_legacy_ms_office(file_path)
+        if not tools_config.get("use_ms_office"):
+            return f"[Ошибка] Для файлов {ext} требуется MS Office (use_ms_office: true в config.yaml)."
+        if not COM_AVAILABLE:
+            return f"[Ошибка] pywin32 не установлен. Установи: pip install pywin32"
+        try:
+            new_path = convert_legacy_ms_office(file_path)
+            file_path = new_path
             ext = Path(file_path).suffix.lower()
-        else:
-            return f"[Ошибка] Для файлов {ext} требуется MS Office."
+            print('  [Legacy] Сконвертировано: ' + file_path)
+        except LegacyConversionError as e:
+            return f"[Ошибка конвертации {ext}]: {e}"
+        except Exception as e:
+            return f"[Неожиданная ошибка конвертации {ext}]: {e}"
 
     if ext == '.txt':
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -30,6 +38,7 @@ def extract_text(file_path: str, tools_config: dict) -> str:
         return extract_image(file_path, tools_config)
     else:
         return f"[Ошибка] Неподдерживаемый формат: {ext}"
+
 
 def extract_docx(file_path: str) -> str:
     doc = Document(file_path)
