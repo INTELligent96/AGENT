@@ -1,0 +1,195 @@
+import os
+
+NL = "\n"
+
+
+# ============ Новый rag/qa.py ============
+QA_PY = NL.join([
+    "import re",
+    "from pathlib import Path",
+    "from .indexer import RAGIndexer",
+    "from llm.registry import LLMRegistry",
+    "",
+    "",
+    "PRONOUNS = [",
+    "    'он', 'она', 'оно', 'они', 'это', 'этот', 'эта', 'эти',",
+    "    'там', 'тут', 'его', 'её', 'их', 'ему', 'ей', 'тот', 'та', 'те',",
+    "]",
+    "",
+    "GENERIC_WORDS = [",
+    "    'что в папке', 'что находится в папке', 'расскажи о папке', 'расскажи про папку',",
+    "    'про папку', 'о папке', 'обзор папки', 'перечень файлов', 'список файлов',",
+    "    'содержимое папки', 'покажи файлы', 'какие файлы',",
+    "]",
+    "",
+    "",
+    "class RAGQuestionAnswerer:",
+    "    def __init__(self, config, tools_config, registry):",
+    "        self.indexer = RAGIndexer(config, tools_config)",
+    "        self.registry = registry",
+    "",
+    "    def _clean_text(self, text):",
+    "        parts = []",
+    "        for w in text.split():",
+    "            if len(w) >= 3 and w[1] == ':' and not w[2].isalnum():",
+    "                continue",
+    "            if w.startswith('/') and len(w) > 2:",
+    "                continue",
+    "            parts.append(w)",
+    "        text = ' '.join(parts)",
+    "        lower = text.lower()",
+    "        for gw in GENERIC_WORDS:",
+    "            lower = lower.replace(gw, ' ')",
+    "        return ' '.join(lower.split()).strip()",
+    "",
+    "    def _split_question(self, question):",
+    "        # Разбиваем на подвопросы по '?' и ';', если есть минимум 2 значимых",
+    "        parts = []",
+    "        for p in re.split(r'[?;]', question):",
+    "            p = p.strip()",
+    "            if len(p) > 12:",
+    "                parts.append(p)",
+    "        if len(parts) < 2:",
+    "            return [question]",
+    "        return parts",
+    "",
+    "    def _build_search_query(self, question, history):",
+    "        if not history:",
+    "            return question",
+    "        last_user = None",
+    "        for h in reversed(history):",
+    "            if h.get('role') == 'user':",
+    "                c = h.get('content', '')",
+    "                if c.startswith('Контекст:') or c.startswith('[Диалог]'):",
+    "                    continue",
+    "                last_user = c",
+    "                break",
+    "        if not last_user:",
+    "            return question",
+    "        is_short = len(question) < 60",
+    "        words = question.lower().split()",
+    "        has_pronoun = any(p in words for p in PRONOUNS)",
+    "        if is_short or has_pronoun:",
+    "            combined = (self._clean_text(last_user) + ' ' + self._clean_text(question)).strip()",
+    "            if combined:",
+    "                print('  [RAG] Поиск с контекстом: ' + combined[:120])",
+    "                return combined",
+    "        return question",
+    "",
+    "    def _get_source_filter(self, folder):",
+    "        if not folder:",
+    "            return None",
+    "        try:",
+    "            files = [str(f) for f in Path(folder).rglob('*') if f.is_file()]",
+    "            if not files:",
+    "                return None",
+    "            return {'source': {'$in': files}}",
+    "        except Exception:",
+    "            return None",
+    "",
+    "    def _multi_search(self, question, history, where):",
+    "        # Multi-query: разбиваем длинный вопрос на подвопросы",
+    "        subquestions = self._split_question(question)",
+    "        if len(subquestions) > 1:",
+    "            print('  [RAG] Multi-query: ' + str(len(subquestions)) + ' подвопросов')",
+    "",
+    "        seen = {}   # key: (source, chunk_id) -> chunk",
+    "        for i, subq in enumerate(subquestions):",
+    "            sq = self._build_search_query(subq, history)",
+    "            if len(subquestions) > 1:",
+    "                print('    [Подвопрос ' + str(i + 1) + '] ' + sq[:70])",
+    "            try:",
+    "                chunks = self.indexer.search(sq, top_k=8, where=where)",
+    "            except Exception as e:",
+    "                print('    [Ошибка поиска]: ' + str(e))",
+    "                continue",
+    "            for c in chunks:",
+    "                key = (c['source'], c['chunk_id'])",
+    "                if key not in seen:",
+    "                    seen[key] = c",
+    "",
+    "        return list(seen.values())[:20]",
+    "",
+    "    def ask(self, question, history=None, last_folder=None, folder_filter=None):",
+    "        where = self._get_source_filter(folder_filter)",
+    "        context_chunks = self._multi_search(question, history, where)",
+    "",
+    "        if not context_chunks:",
+    "            return 'В базе данных не найдено информации по этому вопросу.'",
+    "",
+    "        print('  [RAG] Найдено уникальных чанков: ' + str(len(context_chunks)))",
+    "        print('  [RAG] Источники:')",
+    "        for c in context_chunks:",
+    "            print('    - ' + Path(c['source']).name + ' (part ' + str(c['chunk_id']) + ')')",
+    "",
+    "        context_text = ''",
+    "        for i, chunk in enumerate(context_chunks, 1):",
+    "            src = Path(chunk['source']).name",
+    "            context_text += '--- Фрагмент ' + str(i) + ' (Источник: ' + src + ', часть ' + str(chunk['chunk_id']) + ') ---\\n'",
+    "            context_text += chunk['text'] + '\\n\\n'",
+    "",
+    "        system_prompt = (",
+    "            'Ты - эксперт-аналитик по техническим документам. Отвечай на вопрос, опираясь СТРОГО на предоставленные фрагменты.\\n\\n'",
+    "            'ПРАВИЛА:\\n'",
+    "            '1. Каждый факт, число, название сопровождай ссылкой [файл, часть N].\\n'",
+    "            '2. Если в контексте есть ЧИСЛА (запасы, содержание, тонны) - приводи их ТОЧНО и ПОЛНОСТЬЮ, не обобщай.\\n'",
+    "            '3. Если вопрос о МЕТОДИКЕ - цитируй этапы, способы расчёта, формулы из фрагментов дословно в кавычках.\\n'",
+    "            '4. Если вопрос об ИСХОДНЫХ ДАННЫХ - перечисли, какие данные использовались (пробы, анализы, коэффициенты).\\n'",
+    "            '5. НЕ пиши \"все фрагменты\", \"источники\" - указывай КОНКРЕТНЫЕ файлы и части.\\n'",
+    "            '6. Если ответа в контексте нет - напиши \"в документах не найдено\".\\n'",
+    "            '7. НЕ обобщай, извлекай конкретику.'",
+    "        )",
+    "",
+    "        user_prompt = ''",
+    "        if history:",
+    "            user_prompt += 'ИСТОРИЯ (для контекста):\\n'",
+    "            for h in history[-4:]:",
+    "                role = 'Пользователь' if h['role'] == 'user' else 'Ассистент'",
+    "                user_prompt += role + ': ' + str(h['content'])[:200] + '\\n'",
+    "            user_prompt += '\\n'",
+    "        if last_folder:",
+    "            user_prompt += 'КОНТЕКСТ_ПАПКИ: ' + last_folder + '\\n\\n'",
+    "        user_prompt += 'КОНТЕКСТ ИЗ ДОКУМЕНТОВ:\\n' + context_text + '\\n\\nВОПРОС: ' + question",
+    "",
+    "        print('Генерация ответа (complex_reasoning)...')",
+    "        answer = self.registry.generate_with_fallback('complex_reasoning', user_prompt, system_prompt)",
+    "",
+    "        # Блок \"Использованные источники\" - программно, без участия LLM",
+    "        sources = '\\n\\n' + '=' * 50 + '\\nИСПОЛЬЗОВАННЫЕ ИСТОЧНИКИ:\\n'",
+    "        for i, chunk in enumerate(context_chunks, 1):",
+    "            src = Path(chunk['source']).name",
+    "            preview = chunk['text'][:120].replace('\\n', ' ').strip()",
+    "            sources += str(i) + '. ' + src + ' (часть ' + str(chunk['chunk_id']) + '): «' + preview + '...»\\n'",
+    "        return answer + sources",
+    "",
+])
+
+
+def main():
+    path = "rag/qa.py"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(QA_PY)
+    print("[OK] rag/qa.py перезаписан (multi-query + строгий промпт + источники)")
+    print("")
+    print("=" * 60)
+    print("Готово! Перезапусти: python main.py")
+    print("=" * 60)
+    print("")
+    print("Что нового:")
+    print("1. Multi-query: длинный вопрос разбивается на подвопросы (по ?)")
+    print("2. top_k=20 с дедупликацией (было 12)")
+    print("3. Строгий промпт: цитаты, конкретные файлы, цифры без обобщений")
+    print("4. Блок ИСПОЛЬЗОВАННЫЕ ИСТОЧНИКИ в конце ответа (программно)")
+    print("   - ты видишь все фрагменты, которые использовал агент")
+    print("")
+    print("Проверка:")
+    print("Задай тот же вопрос по ТЭО - увидишь:")
+    print("  [RAG] Multi-query: 3 подвопроса")
+    print("  [RAG] Найдено уникальных чанков: 15")
+    print("  ... ответ ...")
+    print("  ИСПОЛЬЗОВАННЫЕ ИСТОЧНИКИ:")
+    print("  1. Книга_9-11.docx (часть 5): «...»")
+
+
+if __name__ == "__main__":
+    main()

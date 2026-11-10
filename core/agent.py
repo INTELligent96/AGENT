@@ -43,6 +43,7 @@ class Agent:
         self.allowed_paths = [p.strip() for p in safety.get("allowed_paths", []) if str(p).strip()]
         self._indexed_folders = set()
         self.pending_tool = None   # инструмент, ожидающий аргумент (папка/файл)
+        self.pending_query = None  # исходный вопрос пользователя
         self.chat_history = []     # [{'role': 'user'/'assistant', 'content': '...'}, ...]
         self.max_history = 5       # сколько последних пар хранить
         self.last_folder = None    # папка последнего ask_about_folder
@@ -204,6 +205,7 @@ class Agent:
             result = self.ask_about_folder(user_text)
             if isinstance(result, str) and result.startswith("Укажите существующую папку"):
                 self.pending_tool = 'ask_about_folder'
+                self.pending_query = user_text
             return result
 
         if tool_name == "ask_question":
@@ -213,6 +215,7 @@ class Agent:
             fp = self._extract_path_from_text(user_text)
             if not fp:
                 self.pending_tool = 'summarize_file'
+                self.pending_query = user_text
                 return "Укажите файл. Напишите путь следующим сообщением."
             def gen(feedback):
                 text = self._read_safe(fp)
@@ -226,6 +229,7 @@ class Agent:
             fp = self._extract_path_from_text(user_text)
             if not fp:
                 self.pending_tool = 'check_spelling'
+                self.pending_query = user_text
                 return "Укажите файл. Напишите путь следующим сообщением."
             return self.check_spelling_file(fp)
 
@@ -236,6 +240,7 @@ class Agent:
             f = self._extract_folder_from_text(user_text) or self._extract_path_from_text(user_text)
             if not f:
                 self.pending_tool = 'batch_summarize'
+                self.pending_query = user_text
                 return "Укажите папку. Напишите путь следующим сообщением (например: D:/Docs) или повторите команду с путём."
             return self.batch_summarize(f)
 
@@ -243,6 +248,7 @@ class Agent:
             f = self._extract_folder_from_text(user_text)
             if not f:
                 self.pending_tool = 'classify_files'
+                self.pending_query = user_text
                 return "Укажите папку. Напишите путь следующим сообщением."
             return self.classify_files(f)
 
@@ -250,6 +256,7 @@ class Agent:
             f = self._extract_folder_from_text(user_text)
             if not f:
                 self.pending_tool = 'make_file_list'
+                self.pending_query = user_text
                 return "Укажите папку. Напишите путь следующим сообщением."
             return self.make_file_list(f, recursive=True)
 
@@ -412,6 +419,8 @@ class Agent:
             return None
 
         self.pending_tool = None
+        original_q = getattr(self, 'pending_query', '') or ''
+        self.pending_query = None
         log('[Диалог] Использую введённый путь: ' + arg)
 
         try:
@@ -432,7 +441,8 @@ class Agent:
             if tool == 'process_long_doc':
                 return self.process_long_document(arg)
             if tool == 'ask_about_folder':
-                return self.ask_about_folder(arg)
+                combined = original_q + ' ' + arg if original_q else arg
+                return self.ask_about_folder(combined)
         except Exception as e:
             return '[Ошибка] ' + str(e)
         return None
